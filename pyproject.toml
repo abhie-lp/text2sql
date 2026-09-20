@@ -1,0 +1,24 @@
+[project]
+name = "gemini-text-to-sql"
+version = "0.1.0"
+description = "A Streamlit app to convert natural language to SQL using Gemini."
+requires-python = ">=3.14"
+dependencies = [
+    "streamlit",
+    "google-genai",
+    "python-dotenv",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear (catches common logic bugs)
+    "SIM", # flake8-simplify (simplifies code structure)
+]
