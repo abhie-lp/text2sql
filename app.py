@@ -1,7 +1,7 @@
+import atexit
 from dotenv import load_dotenv
 
 load_dotenv()
-
 import streamlit as st
 import os
 import sqlite3
@@ -14,15 +14,21 @@ GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 DB_URI = "file:student.db?mode=ro"
 
 
-def get_gemini_response(question):
+@st.cache_resource
+def get_client() -> Client:
+    client = Client(api_key=GEMINI_API_KEY)
+    atexit.register(client.close)
+    return client
+
+
+def get_gemini_response(question) -> str:
     # Provide SQL query as respone
-    with Client(api_key=GEMINI_API_KEY) as client:
-        resp = client.models.generate_content(
-            model=MODEL,
-            contents=question,
-            config=types.GenerateContentConfig(system_instruction=PROMPT),
-        )
-        return resp.text
+    resp = get_client().models.generate_content(
+        model=MODEL,
+        contents=question,
+        config=types.GenerateContentConfig(system_instruction=PROMPT),
+    )
+    return resp.text
 
 
 def read_sql_squery(sql):
@@ -51,11 +57,10 @@ question = st.text_input("Input: ", key="input")
 submit = st.button("Ask!")
 
 if question or submit:
-    sql = get_gemini_response(question)
-    st.code(sql, language="sql")
     try:
-        data = read_sql_squery(sql)
+        sql = get_gemini_response(question)
+        st.code(sql, language="sql")
         st.subheader("The response is:")
-        st.dataframe(data)
+        st.dataframe(read_sql_squery(sql))
     except Exception as e:
         st.error(f"Query failed: {e}")
