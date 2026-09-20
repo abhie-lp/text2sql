@@ -1,17 +1,43 @@
 import atexit
+
 from dotenv import load_dotenv
 
 load_dotenv()
-import streamlit as st
 import os
 import sqlite3
 
+import streamlit as st
 from google.genai import Client, types
 
 # Configure
 MODEL = "gemini-flash-latest"
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 DB_URI = "file:student.db?mode=ro"
+SCHEMA = ""
+with open("./schema.sql") as f:
+    SCHEMA = f.read()
+PROMPT = f"""
+You are a Text-to-SQL generator.
+Your ONLY job:
+Convert the input question into a valid SQLite SQL Query.
+Database schema:
+    {SCHEMA}
+
+Rules:
+- Only use tables and columns provided above.
+- Generate SELECT queries only.
+- Never INSERT, UPDATE, DELETE, DROP, ALTER or CREATE.
+- Return ONLY the SQL query.
+- Do not use markdown.
+- Do not explain the query.
+
+For example, the output of:
+    - "How many entries of records are present?" is "SELECT COUNT(*) from student;"
+    - "All the students studying in ds class?" is "SELECT * FROM student WHERE class='DS';"
+    - "Names of students in section a" is "SELECT name FROM student WHERE section='A'"
+
+"""
+CONFIG = types.GenerateContentConfig(system_instruction=PROMPT)
 
 
 @st.cache_resource
@@ -26,7 +52,7 @@ def get_gemini_response(question) -> str:
     resp = get_client().models.generate_content(
         model=MODEL,
         contents=question,
-        config=types.GenerateContentConfig(system_instruction=PROMPT),
+        config=CONFIG,
     )
     return resp.text
 
@@ -38,17 +64,6 @@ def read_sql_squery(sql):
         return conn.execute(sql).fetchall()
     finally:
         conn.close()
-
-
-PROMPT = """
-You are an EXPERT in the only job of converting English questions to SQL query!
-The SQL database as the name 'student' and has the following columns: [name, class, section, marks].
-For example, the output of:
-    - "How many entries of records are present?" is "SELECT COUNT(*) from student;"
-    - "All the students studying in DS class?" is "SELECT * FROM student WHERE class='DS';"
-
-The SQL output should be a valid SQL statement with no quotation marks of any kind enclosing the entire statement.
-"""
 
 
 st.set_page_config(page_title="I can retrieve any SQL query.")
