@@ -10,7 +10,7 @@ import streamlit as st
 from google.genai import Client, types
 
 # Configure
-MODEL = "gemini-flash-latest"
+MODEL = os.environ["GEMINI_MODEL"]
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 DB_URI = "file:student.db?mode=ro"
 SCHEMA = ""
