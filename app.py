@@ -106,7 +106,7 @@ if submit and question.strip():
         st.error(f"Failed to generate query: {e}")
     else:
         for query in result["queries"]:
-            st.markdown(f"#### {query['question']}")
+            st.markdown(f"#### {query['question'].capitalize()}")
             st.code(query["sql"], language="sql")
             try:
                 columns, rows = read_sql_query(query["sql"])
