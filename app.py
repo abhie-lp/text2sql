@@ -1,5 +1,6 @@
 import atexit
 
+import sqlglot
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -10,6 +11,7 @@ from typing import TypedDict
 import pandas as pd
 import streamlit as st
 from google.genai import Client, types
+from sqlglot import exp
 
 # Configure
 MODEL = os.environ["GEMINI_MODEL"]
@@ -65,8 +67,20 @@ def get_gemini_response(question, model) -> Queries:
     return resp.parsed
 
 
-def read_sql_query(sql) -> tuple[list[str], list]:
+def validate_sql(sql: str):
+    # parse the sql as SQLite and raise ParseError on invalid syntax
+    stmts = [s for s in sqlglot.parse(sql, read="sqlite") if s]
+    if len(stmts) != 1:
+        raise ValueError("Exactly one SQL statement is allowed.")
+
+    if not isinstance(stmts[0], (exp.Select, exp.Union)):
+        raise ValueError("Only SELECt queries are allowed.")
+    return sql
+
+
+def read_sql_query(sql: str) -> tuple[list[str], list]:
     # Retrieve data from the db
+    validate_sql(sql)
     conn = sqlite3.connect(DB_URI, uri=True)
     try:
         cur = conn.execute(sql)
@@ -97,6 +111,6 @@ if submit and question.strip():
             try:
                 columns, rows = read_sql_query(query["sql"])
                 df = pd.DataFrame(rows, columns=columns)
-                st.dataframe(df, column_order=columns, use_container_width=True, hide_index=True)
-            except sqlite3.Error as e:
+                st.dataframe(df, column_order=columns, width="stretch", hide_index=True)
+            except (sqlite3.Error, ValueError) as e:
                 st.error(f"SQL failed: {e}")
