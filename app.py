@@ -5,7 +5,9 @@ from dotenv import load_dotenv
 load_dotenv()
 import os
 import sqlite3
+from typing import TypedDict
 
+import pandas as pd
 import streamlit as st
 from google.genai import Client, types
 
@@ -15,9 +17,7 @@ GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 DB_URI = "file:student.db?mode=ro"
 PROMPT = ""
 with open("./prompt.txt") as fp, open("./schema.sql") as fs:
-    PROMPT = fp.read().format(SCHEMA=fs.read())
-CONFIG = types.GenerateContentConfig(system_instruction=PROMPT)
-
+    PROMPT = fp.read().replace("{SCHEMA}", fs.read())
 
 SKIP = ("tts", "image", "transcribe", "computer-use", "robotics", "omni", "customtools", "pro")
 
@@ -27,9 +27,9 @@ def list_models() -> list[str]:
     names = (
         m.name.removeprefix("models/")
         for m in get_client().models.list()
-        if m.name.startswith("gemini") or "generateContent" in (m.supported_actions or [])
+        if "generateContent" in (m.supported_actions or [])
     )
-    return [n for n in names if not any(s in n for s in SKIP)]
+    return [n for n in names if n.startswith("gemini") and not any(s in n for s in SKIP)]
 
 
 @st.cache_resource
@@ -39,21 +39,40 @@ def get_client() -> Client:
     return client
 
 
-def get_gemini_response(question, model) -> str:
+class QueryResult(TypedDict):
+    question: str
+    sql: str
+
+
+class Queries(TypedDict):
+    queries: list[QueryResult]
+
+
+CONFIG = types.GenerateContentConfig(
+    system_instruction=PROMPT,
+    response_mime_type="application/json",
+    response_schema=Queries,
+)
+
+
+def get_gemini_response(question, model) -> Queries:
     # Provide SQL query as respone
     resp = get_client().models.generate_content(
         model=model,
         contents=question,
         config=CONFIG,
     )
-    return resp.text
+    return resp.parsed
 
 
-def read_sql_query(sql):
+def read_sql_query(sql) -> tuple[list[str], list]:
     # Retrieve data from the db
     conn = sqlite3.connect(DB_URI, uri=True)
     try:
-        return conn.execute(sql).fetchall()
+        cur = conn.execute(sql)
+        columns = [description[0] for description in cur.description]
+        rows = cur.fetchall()
+        return columns, rows
     finally:
         conn.close()
 
@@ -68,9 +87,16 @@ model = st.sidebar.selectbox("Model", models, index=models.index(MODEL) if MODEL
 
 if submit and question.strip():
     try:
-        sql = get_gemini_response(question, model)
-        st.code(sql, language="sql")
-        st.subheader("The response is:")
-        st.dataframe(read_sql_query(sql))
+        result: Queries = get_gemini_response(question, model)
     except Exception as e:
-        st.error(f"Query failed: {e}")
+        st.error(f"Failed to generate query: {e}")
+    else:
+        for query in result["queries"]:
+            st.markdown(f"#### {query['question']}")
+            st.code(query["sql"], language="sql")
+            try:
+                columns, rows = read_sql_query(query["sql"])
+                df = pd.DataFrame(rows, columns=columns)
+                st.dataframe(df, column_order=columns, use_container_width=True, hide_index=True)
+            except sqlite3.Error as e:
+                st.error(f"SQL failed: {e}")
