@@ -13,30 +13,9 @@ from google.genai import Client, types
 MODEL = os.environ["GEMINI_MODEL"]
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 DB_URI = "file:student.db?mode=ro"
-SCHEMA = ""
-with open("./schema.sql") as f:
-    SCHEMA = f.read()
-PROMPT = f"""
-You are a Text-to-SQL generator.
-Your ONLY job:
-Convert the input question into a valid SQLite SQL Query.
-Database schema:
-    {SCHEMA}
-
-Rules:
-- Only use tables and columns provided above.
-- Generate SELECT queries only.
-- Never INSERT, UPDATE, DELETE, DROP, ALTER or CREATE.
-- Return ONLY the SQL query.
-- Do not use markdown.
-- Do not explain the query.
-
-For example, the output of:
-    - "How many entries of records are present?" is "SELECT COUNT(*) from student;"
-    - "All the students studying in ds class?" is "SELECT * FROM student WHERE class='DS';"
-    - "Names of students in section a" is "SELECT name FROM student WHERE section='A'"
-
-"""
+PROMPT = ""
+with open("./prompt.txt") as fp, open("./schema.sql") as fs:
+    PROMPT = fp.read().format(SCHEMA=fs.read())
 CONFIG = types.GenerateContentConfig(system_instruction=PROMPT)
 
 
@@ -70,7 +49,7 @@ def get_gemini_response(question, model) -> str:
     return resp.text
 
 
-def read_sql_squery(sql):
+def read_sql_query(sql):
     # Retrieve data from the db
     conn = sqlite3.connect(DB_URI, uri=True)
     try:
@@ -81,16 +60,17 @@ def read_sql_squery(sql):
 
 st.set_page_config(page_title="Ask about the student data.")
 st.header("App to retrieve the data of student")
-question = st.text_input("Input: ", key="input", placeholder="Question about student.")
-submit = st.button("Ask!")
+with st.form("query_form"):
+    question = st.text_input("Input: ", placeholder="Question about student.")
+    submit = st.form_submit_button("Ask!")
 models = list_models()
 model = st.sidebar.selectbox("Model", models, index=models.index(MODEL) if MODEL in models else 0)
 
-if question or submit:
+if submit and question.strip():
     try:
         sql = get_gemini_response(question, model)
         st.code(sql, language="sql")
         st.subheader("The response is:")
-        st.dataframe(read_sql_squery(sql))
+        st.dataframe(read_sql_query(sql))
     except Exception as e:
         st.error(f"Query failed: {e}")
