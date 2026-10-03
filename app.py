@@ -4,12 +4,14 @@ import sqlglot
 from dotenv import load_dotenv
 
 load_dotenv()
+import re
 import os
 import sqlite3
 from typing import TypedDict
 
 import pandas as pd
 import streamlit as st
+from textwrap import indent
 from google.genai import Client, types
 from sqlglot import exp
 
@@ -17,9 +19,27 @@ from sqlglot import exp
 MODEL = os.environ["GEMINI_MODEL"]
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 DB_URI = "file:student.db?mode=ro"
+RE_PATTERN = r"""
+^\s*PRAGMA\b.*?;\s* |
+^\s*CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+ |
+^\s*(?:UNIQUE|CHECK)\s*\([^;\n]*\),?\s*\n |
+^\s*CREATE\s+INDEX\b.*?;\s*
+"""
 PROMPT = ""
 with open("./prompt.txt") as fp, open("./schema.sql") as fs:
-    PROMPT = fp.read().replace("{SCHEMA}", fs.read())
+    PROMPT = fp.read().replace(
+        "{SCHEMA}",
+        indent(
+            re.sub(
+                RE_PATTERN,
+                "",
+                fs.read(),
+                flags=re.IGNORECASE | re.MULTILINE | re.DOTALL | re.VERBOSE,
+            ),
+            "  ",
+        ),
+    )
+    print(PROMPT)
 
 SKIP = ("tts", "image", "transcribe", "computer-use", "robotics", "omni", "customtools", "pro")
 
@@ -74,7 +94,7 @@ def validate_sql(sql: str):
         raise ValueError("Exactly one SQL statement is allowed.")
 
     if not isinstance(stmts[0], (exp.Select, exp.Union)):
-        raise ValueError("Only SELECt queries are allowed.")
+        raise ValueError("Only SELECT queries are allowed.")
     return sql
 
 
