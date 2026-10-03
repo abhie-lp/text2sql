@@ -1,3 +1,4 @@
+import sqlglot
 import atexit
 import os
 import re
@@ -85,6 +86,10 @@ def get_gemini_response(question, model) -> Queries:
     return resp.parsed
 
 
+def format_sql(sql: str) -> str:
+    return sqlglot.transpile(sql, pretty=True, indent=2)[0]
+
+
 def validate_sql(sql: str):
     # parse the sql as SQLite and raise ParseError on invalid syntax
     stmts = [s for s in sqlglot.parse(sql, read="sqlite") if s]
@@ -142,7 +147,7 @@ if submit and question.strip():
         for query in result["queries"]:
             st.markdown(f"#### {query['question']}")
             with st.expander("View SQL:"):
-                st.code(query["sql"], language="sql")
+                st.code(format_sql(query["sql"]), language="sql")
             try:
                 columns, rows = read_sql_query(query["sql"])
                 df = pd.DataFrame(rows, columns=columns)
