@@ -1,19 +1,18 @@
 import atexit
-
-import sqlglot
-from dotenv import load_dotenv
-
-load_dotenv()
-import re
 import os
+import re
 import sqlite3
+from textwrap import indent
 from typing import TypedDict
 
 import pandas as pd
+import sqlglot
 import streamlit as st
-from textwrap import indent
+from dotenv import load_dotenv
 from google.genai import Client, types
 from sqlglot import exp
+
+load_dotenv()
 
 # Configure
 MODEL = os.environ["GEMINI_MODEL"]
@@ -135,13 +134,15 @@ with st.form("query_form"):
 
 if submit and question.strip():
     try:
-        result: Queries = get_gemini_response(question, model)
+        with st.spinner("Generating SQL..."):
+            result: Queries = get_gemini_response(question, model)
     except Exception as e:
         st.error(f"Failed to generate query: {e}")
     else:
         for query in result["queries"]:
             st.markdown(f"#### {query['question']}")
-            st.code(query["sql"], language="sql")
+            with st.expander("View SQL:"):
+                st.code(query["sql"], language="sql")
             try:
                 columns, rows = read_sql_query(query["sql"])
                 df = pd.DataFrame(rows, columns=columns)
