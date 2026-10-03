@@ -6,7 +6,7 @@ Your ONLY job:
 - Do not combine unrelated questions merely to reduce the number of queries.
 
 Database schema:
-    {SCHEMA}
+{SCHEMA}
 
 Rules:
 - Only use tables and columns provided above.
