@@ -110,13 +110,28 @@ def read_sql_query(sql: str) -> tuple[list[str], list]:
         conn.close()
 
 
+models = list_models()
 st.set_page_config(page_title="Ask about the student data.")
 st.header("App to retrieve the data of student")
 with st.form("query_form"):
-    question = st.text_input("Input: ", placeholder="Question about student.")
-    submit = st.form_submit_button("Ask!")
-models = list_models()
-model = st.sidebar.selectbox("Model", models, index=models.index(MODEL) if MODEL in models else 0)
+    question = st.text_input(
+        "What do you want to know?",
+        placeholder="What do you want to know?",
+        label_visibility="collapsed",
+    )
+
+    col1, col2 = st.columns(2)
+    with col1:
+        submit = st.form_submit_button("Ask!")
+
+    with col2:
+        model = st.selectbox(
+            "Model",
+            models,
+            index=models.index(MODEL) if MODEL in models else 0,
+            label_visibility="collapsed",
+            width="stretch",
+        )
 
 if submit and question.strip():
     try:
