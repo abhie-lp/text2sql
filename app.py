@@ -39,7 +39,6 @@ with open("./prompt.txt") as fp, open("./schema.sql") as fs:
             "  ",
         ),
     )
-    print(PROMPT)
 
 SKIP = ("tts", "image", "transcribe", "computer-use", "robotics", "omni", "customtools", "pro")
 
